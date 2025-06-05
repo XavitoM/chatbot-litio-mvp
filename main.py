@@ -8,7 +8,7 @@ import os
 
 app = FastAPI()
 
-# Permitir solicitudes desde frontend local
+# Permitir solicitudes desde cualquier origen (ajustable según necesidad)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,6 +17,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Configurar clave de API
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 class Message(BaseModel):
@@ -24,14 +25,17 @@ class Message(BaseModel):
 
 @app.post("/mensaje")
 async def recibir_mensaje(message: Message):
-    respuesta = openai.ChatCompletion.create(
+    client = openai.OpenAI(api_key=openai.api_key)
+
+    respuesta = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[
-            {"role": "system", "content": "Eres un asistente médico experto en seguimiento de pacientes con litio, tienes que revisar los criterios de gravedad de cualquier grado para poder preguntarle al paciente los diferentes sintomas que pueda tener de una forma que no se sugestiva, ya que lidias con pacientes que son especialmente vulnerables."},
+            {"role": "system", "content": "Eres un asistente médico experto en seguimiento de pacientes con litio. Evalúas criterios de gravedad de forma no sugestiva porque tus pacientes son vulnerables. Ademas debes consultar al menos una vez a la semana sobre los sintomas suicidas y evaluar su gravedad segun las escalas mas modernas."},
             {"role": "user", "content": message.content}
         ]
     )
-    contenido_respuesta = respuesta['choices'][0]['message']['content']
+
+    contenido_respuesta = respuesta.choices[0].message.content
 
     if "urgencias" in contenido_respuesta.lower():
         enviar_correo_alerta(message.content, contenido_respuesta)
@@ -52,9 +56,4 @@ def enviar_correo_alerta(mensaje_original, respuesta):
         servidor.starttls()
         servidor.login(remitente, password)
         servidor.send_message(mensaje)
-from fastapi.responses import HTMLResponse
 
-@app.get("/", response_class=HTMLResponse)
-async def serve_index():
-    with open("index.html", "r", encoding="utf-8") as f:
-        return f.read()
