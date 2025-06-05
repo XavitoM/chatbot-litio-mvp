@@ -6,21 +6,33 @@
 </head>
 <body>
   <h2>Chatbot de Seguimiento para Pacientes con Litio</h2>
+
   <textarea id="input" rows="5" cols="50" placeholder="Escribe tu mensaje..."></textarea><br>
   <button onclick="enviarMensaje()">Enviar</button>
-  <pre id="respuesta"></pre>
+
+  <h3>Respuesta:</h3>
+  <pre id="respuesta" style="background:#f0f0f0; padding:1em;"></pre>
 
   <script>
     async function enviarMensaje() {
       const mensaje = document.getElementById('input').value;
-      const respuesta = await fetch('/mensaje', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({content: mensaje})
-      });
+      const respuestaElem = document.getElementById('respuesta');
 
-      const data = await respuesta.json();
-      document.getElementById('respuesta').innerText = data.respuesta;
+      try {
+        const response = await fetch('/mensaje', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ content: mensaje })
+        });
+
+        const data = await response.json();
+        respuestaElem.textContent = data.respuesta;
+      } catch (error) {
+        respuestaElem.textContent = "⚠️ Error al conectar con el servidor.";
+        console.error(error);
+      }
     }
   </script>
 </body>
