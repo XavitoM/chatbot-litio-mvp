@@ -19,54 +19,46 @@
   <textarea id="input" placeholder="Escribe tu mensaje aquí..."></textarea>
   <button onclick="enviarMensaje()">Enviar</button>
 
-  <script>
-    const chat = document.getElementById('chat');
-    const input = document.getElementById('input');
+ <script>
+  const chat = document.getElementById('chat');
+  const input = document.getElementById('input');
 
-    async function enviarMensaje() {
-      const mensaje = input.value.trim();
-      if (!mensaje) return;
+  async function enviarMensaje() {
+    const mensaje = input.value.trim();
+    if (!mensaje) return;
 
-      agregarMensaje("mensaje-paciente", mensaje);
-      input.value = "";
+    agregarMensaje("mensaje-paciente", mensaje);
+    input.value = "";
 
-      try {
-        const respuesta = await fetch("/mensaje", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: mensaje })
-        });
+    try {
+      const respuesta = await fetch("/mensaje", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: mensaje })
+      });
 
-        const data = await respuesta.json();
-        agregarMensaje("mensaje-bot", data.respuesta);
-      } catch (error) {
-        agregarMensaje("mensaje-bot", "Error al conectar con el servidor.");
-      }
+      const data = await respuesta.json();
+      agregarMensaje("mensaje-bot", data.respuesta);
+    } catch (error) {
+      agregarMensaje("mensaje-bot", "Error al conectar con el servidor.");
     }
-
-    function agregarMensaje(clase, texto) {
-      const msg = document.createElement("div");
-      msg.className = clase;
-      msg.textContent = texto;
-      chat.appendChild(msg);
-      chat.scrollTop = chat.scrollHeight;
-    }
-
-    input.addEventListener("keydown", function(event) {
-  if (event.key === "Enter" && !event.shiftKey) {
-    event.preventDefault(); // Enviar con Enter
-    enviarMensaje();
-  } else if (event.key === "Enter" && event.shiftKey) {
-    // Insertar salto de línea si Shift+Enter
-    const pos = input.selectionStart;
-    input.value = input.value.slice(0, pos) + "\\n" + input.value.slice(pos);
-    input.selectionStart = input.selectionEnd = pos + 1;
-    event.preventDefault();
   }
-});
 
-      }
-    });
-  </script>
+  function agregarMensaje(clase, texto) {
+    const msg = document.createElement("div");
+    msg.className = clase;
+    msg.textContent = texto;
+    chat.appendChild(msg);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  input.addEventListener("keydown", function(event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault(); // Enviar con Enter
+      enviarMensaje();
+    }
+  });
+</script>
+
 </body>
 </html>
