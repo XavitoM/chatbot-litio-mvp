@@ -68,7 +68,7 @@ def registrar_interaccion(mensaje, respuesta):
     resumen = sintetizar_resumen(mensaje)
 
     # Guardar resumen CSV
-    with open("registro_resumen.csv", "a", newline='', encoding='utf-8") as f:
+    with open("registro_resumen.csv", "a", newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         writer.writerow([fecha, nombre, rut, resumen])
 
