@@ -1,10 +1,11 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-import openai
+from openai import OpenAI
 import smtplib
 from email.mime.text import MIMEText
 from fastapi.middleware.cors import CORSMiddleware
 import os
+from fastapi.responses import HTMLResponse
 
 app = FastAPI()
 
@@ -18,14 +19,14 @@ app.add_middleware(
 )
 
 # Configurar clave de API
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 class Message(BaseModel):
     content: str
 
 @app.post("/mensaje")
 async def recibir_mensaje(message: Message):
-    client = openai.OpenAI(api_key=openai.api_key)
+    client = OpenAI(api_key=openai.api_key)
 
     respuesta = client.chat.completions.create(
         model="gpt-3.5-turbo",
@@ -56,4 +57,9 @@ def enviar_correo_alerta(mensaje_original, respuesta):
         servidor.starttls()
         servidor.login(remitente, password)
         servidor.send_message(mensaje)
+
+@app.get("/", response_class=HTMLResponse)
+async def serve_index():
+    with open("index.html", "r", encoding="utf-8") as f:
+        return f.read()
 
