@@ -56,5 +56,6 @@ def enviar_correo_alerta(mensaje_original, respuesta):
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
-    with open("index.html", "r", encoding="utf-8") as f:
+    path = os.path.join(os.path.dirname(__file__), "index.html")
+    with open(path, "r", encoding="utf-8") as f:
         return f.read()
