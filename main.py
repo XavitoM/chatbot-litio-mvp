@@ -9,7 +9,6 @@ from fastapi.responses import HTMLResponse
 
 app = FastAPI()
 
-# Permitir solicitudes desde cualquier origen (ajustable según necesidad)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,20 +17,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configurar clave de API
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
 class Message(BaseModel):
     content: str
 
 @app.post("/mensaje")
 async def recibir_mensaje(message: Message):
-    client = OpenAI(api_key=openai.api_key)
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     respuesta = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[
-            {"role": "system", "content": "Eres un asistente médico experto en seguimiento de pacientes con litio. Evalúas criterios de gravedad de forma no sugestiva porque tus pacientes son vulnerables. Ademas debes consultar al menos una vez a la semana sobre los sintomas suicidas y evaluar su gravedad segun las escalas mas modernas."},
+            {"role": "system", "content": "Eres un asistente médico experto en seguimiento de pacientes con litio. Evalúas criterios de gravedad de forma no sugestiva porque tus pacientes son vulnerables. Además, debes consultar al menos una vez a la semana sobre los síntomas suicidas y evaluar su gravedad según las escalas más modernas."},
             {"role": "user", "content": message.content}
         ]
     )
@@ -62,4 +58,3 @@ def enviar_correo_alerta(mensaje_original, respuesta):
 async def serve_index():
     with open("index.html", "r", encoding="utf-8") as f:
         return f.read()
-
