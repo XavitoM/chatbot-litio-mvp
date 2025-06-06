@@ -27,3 +27,12 @@ uvicorn main:app --reload
 ```
 
 4. Abre `web/index.html` en tu navegador.
+
+El bot ahora puede recordar tu nombre o RUT si los envías por separado. Si solo
+envías tu nombre, se te solicitará el RUT en el siguiente mensaje y viceversa.
+
+Para ejecutar las pruebas:
+```
+pip install -r requirements.txt
+pytest
+```
