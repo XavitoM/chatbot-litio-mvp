@@ -24,8 +24,11 @@ class Message(BaseModel):
     content: str
 
 pacientes_en_sesion = {}  # rut -> nombre
+nombre_pendiente = ""
+rut_pendiente = ""
 @app.post("/mensaje")
 async def recibir_mensaje(message: Message):
+    global nombre_pendiente, rut_pendiente
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     texto = message.content
 
@@ -39,6 +42,28 @@ async def recibir_mensaje(message: Message):
         nombre = pacientes_en_sesion[rut]
     elif nombre and rut:
         pacientes_en_sesion[rut] = nombre
+        nombre_pendiente = ""
+        rut_pendiente = ""
+    elif nombre and not rut:
+        nombre_pendiente = nombre
+        if rut_pendiente:
+            pacientes_en_sesion[rut_pendiente] = nombre
+            rut = rut_pendiente
+            nombre_pendiente = ""
+            rut_pendiente = ""
+        else:
+            registrar_rut_fallido(texto, nombre, rut)
+            return {"respuesta": f"Gracias {nombre.split()[0]}, ¿podrías indicarme tu RUT?"}
+    elif rut and not nombre:
+        rut_pendiente = rut
+        if nombre_pendiente:
+            pacientes_en_sesion[rut] = nombre_pendiente
+            nombre = nombre_pendiente
+            nombre_pendiente = ""
+            rut_pendiente = ""
+        else:
+            registrar_rut_fallido(texto, nombre, rut)
+            return {"respuesta": "Gracias. ¿Cuál es tu nombre completo?"}
     else:
         registrar_rut_fallido(texto, nombre, rut)
         respuesta_presentacion = (
@@ -107,8 +132,8 @@ def registrar_rut_fallido(texto, nombre, rut):
 
 def extraer_rut(texto):
     texto = texto.replace(".", "").replace(" ", "").lower()
-    posibles = re.findall(r"\b\d{7,8}-?[\dk]\b", texto)
-    return posibles[0] if posibles else ""
+    match = re.search(r"\d{7,8}-?[0-9k]", texto)
+    return match.group(0) if match else ""
 
 def normalizar_rut(rut):
     rut = rut.replace(".", "").replace(" ", "").upper()
@@ -119,13 +144,11 @@ def normalizar_rut(rut):
     return ""
 
 def extraer_nombre(texto):
-    texto_limpio = re.sub(r"\b\d{7,8}-?[\dk]\b", "", texto)  # eliminar posibles RUTs
-    texto_limpio = texto_limpio.lower()
-    texto_limpio = re.sub(r"mi nombre es|soy|me llamo", "", texto_limpio)
-    partes = texto_limpio.strip().split()
-    posibles = [p for p in partes if p.isalpha() and len(p) > 2]
-    if len(posibles) >= 2:
-        return f"{posibles[0].capitalize()} {posibles[1].capitalize()}"
+    texto_limpio = re.sub(r"\b\d{7,8}-?[0-9kK]\b", "", texto, flags=re.IGNORECASE)
+    texto_limpio = re.sub(r"\brut\b", "", texto_limpio, flags=re.IGNORECASE)
+    palabras = re.findall(r"[A-Za-zÁÉÍÓÚáéíóúÑñ]+", texto_limpio)
+    if len(palabras) >= 2:
+        return f"{palabras[-2].capitalize()} {palabras[-1].capitalize()}"
     return ""
 
 def requiere_aclaracion(texto):
