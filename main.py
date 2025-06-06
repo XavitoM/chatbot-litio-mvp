@@ -24,7 +24,6 @@ class Message(BaseModel):
     content: str
 
 pacientes_en_sesion = {}  # rut -> nombre
-
 @app.post("/mensaje")
 async def recibir_mensaje(message: Message):
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -39,7 +38,13 @@ async def recibir_mensaje(message: Message):
     elif nombre and rut:
         pacientes_en_sesion[rut] = nombre
     else:
-        return {"respuesta": "Hola, soy tu asistente médico. Estoy aquí para ayudarte a monitorear tu tratamiento con litio y síntomas relacionados. Antes de comenzar, por favor indícame tu nombre completo y tu RUT para poder registrarte correctamente."}
+        registrar_rut_fallido(texto)
+        respuesta_presentacion = (
+            "Hola, soy tu asistente médico. Estoy aquí para ayudarte a monitorear tu tratamiento con litio y tus síntomas. "
+            "Por ahora no pude registrar tu nombre o RUT correctamente, ya que soy un prototipo aún en desarrollo. "
+            "De todos modos, puedes contarme lo que te pasa y haré lo mejor posible por ayudarte."
+        )
+        return {"respuesta": respuesta_presentacion}
 
     if requiere_aclaracion(texto):
         return {"respuesta": "¿Podrías explicarme un poco más a qué te refieres con eso? Quiero entender bien para poder ayudarte mejor."}
@@ -91,6 +96,12 @@ def registrar_interaccion(nombre, rut, mensaje, respuesta, resumen):
     with open(archivo, "a", encoding="utf-8") as f:
         f.write(f"[{fecha}] Usuario: {mensaje}\n")
         f.write(f"[{fecha}] Bot: {respuesta}\n\n")
+
+def registrar_rut_fallido(texto):
+    os.makedirs("logs", exist_ok=True)
+    with open("logs/rut_fallido.log", "a", encoding="utf-8") as f:
+        fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        f.write(f"[{fecha}] Texto sin RUT válido: {texto}\n")
 
 def extraer_rut(texto):
     texto = texto.replace(".", "").replace(" ", "").lower()
