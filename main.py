@@ -77,7 +77,7 @@ def registrar_interaccion(nombre, rut, mensaje, respuesta, resumen):
     os.makedirs("conversaciones", exist_ok=True)
     fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    with open("registro_resumen.csv", "a", newline='', encoding='utf-8') as f:
+    with open("registro_resumen.csv", "a", newline='', encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow([fecha, nombre, rut, resumen])
 
@@ -94,11 +94,14 @@ def extraer_rut(texto):
 def normalizar_rut(rut):
     rut = rut.replace(".", "").replace(" ", "").upper()
     if "-" not in rut and len(rut) >= 8:
-        return rut[:-1] + "-" + rut[-1]
-    return rut
+        rut = rut[:-1] + "-" + rut[-1]
+    if re.match(r"^\d{7,8}-[\dK]$", rut):
+        return rut
+    return ""
 
 def extraer_nombre(texto):
-    partes = texto.strip().split()
+    texto_limpio = re.sub(r"\b\d{7,8}-?[\dk]\b", "", texto)  # eliminar posibles RUTs
+    partes = texto_limpio.strip().split()
     posibles = [p for p in partes if p.isalpha() and len(p) > 2]
     if len(posibles) >= 2:
         return f"{posibles[0]} {posibles[1]}"
