@@ -24,7 +24,6 @@ class Message(BaseModel):
     content: str
 
 pacientes_en_sesion = {}  # rut -> nombre
-
 @app.post("/mensaje")
 async def recibir_mensaje(message: Message):
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -34,12 +33,14 @@ async def recibir_mensaje(message: Message):
     rut = normalizar_rut(extraer_rut(texto))
     fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+    print("DEBUG | Nombre extraído:", nombre, "| RUT normalizado:", rut)
+
     if rut in pacientes_en_sesion:
         nombre = pacientes_en_sesion[rut]
     elif nombre and rut:
         pacientes_en_sesion[rut] = nombre
     else:
-        registrar_rut_fallido(texto)
+        registrar_rut_fallido(texto, nombre, rut)
         respuesta_presentacion = (
             "Hola, soy tu asistente médico. Estoy aquí para ayudarte a monitorear tu tratamiento con litio y tus síntomas. "
             "Por ahora no pude registrar tu nombre o RUT correctamente, ya que soy un prototipo aún en desarrollo. "
@@ -98,32 +99,33 @@ def registrar_interaccion(nombre, rut, mensaje, respuesta, resumen):
         f.write(f"[{fecha}] Usuario: {mensaje}\n")
         f.write(f"[{fecha}] Bot: {respuesta}\n\n")
 
-def registrar_rut_fallido(texto):
+def registrar_rut_fallido(texto, nombre, rut):
     os.makedirs("logs", exist_ok=True)
     with open("logs/rut_fallido.log", "a", encoding="utf-8") as f:
         fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        f.write(f"[{fecha}] Texto sin RUT válido: {texto}\n")
+        f.write(f"[{fecha}] Nombre detectado: '{nombre}' | RUT detectado: '{rut}' | Texto original: {texto}\n")
 
 def extraer_rut(texto):
-    texto = texto.lower().replace(".", "").replace(" ", "")
-    match = re.search(r"(?:rut|es)?\D*(\d{7,8}-?[\dk])", texto)
-    return match.group(1) if match else ""
+    texto = texto.replace(".", "").replace(" ", "").lower()
+    posibles = re.findall(r"\b\d{7,8}-?[\dk]\b", texto)
+    return posibles[0] if posibles else ""
 
 def normalizar_rut(rut):
     rut = rut.replace(".", "").replace(" ", "").upper()
     if "-" not in rut and len(rut) >= 8:
         rut = rut[:-1] + "-" + rut[-1]
-    rut = re.sub(r"[^\dK]", "", rut[:-1]) + "-" + rut[-1]  # asegurar formato XXXXXXXX-Y
     if re.match(r"^\d{7,8}-[\dK]$", rut):
         return rut
     return ""
 
 def extraer_nombre(texto):
     texto_limpio = re.sub(r"\b\d{7,8}-?[\dk]\b", "", texto)  # eliminar posibles RUTs
+    texto_limpio = texto_limpio.lower()
+    texto_limpio = re.sub(r"mi nombre es|soy|me llamo", "", texto_limpio)
     partes = texto_limpio.strip().split()
     posibles = [p for p in partes if p.isalpha() and len(p) > 2]
     if len(posibles) >= 2:
-        return f"{posibles[0]} {posibles[1]}"
+        return f"{posibles[0].capitalize()} {posibles[1].capitalize()}"
     return ""
 
 def requiere_aclaracion(texto):
