@@ -26,11 +26,17 @@ class Message(BaseModel):
 pacientes_en_sesion = {}  # rut -> nombre
 nombre_pendiente = ""
 rut_pendiente = ""
+
 rut_en_conversacion = ""
 esperando_respuesta_litio = False
 @app.post("/mensaje")
 async def recibir_mensaje(message: Message):
     global nombre_pendiente, rut_pendiente, rut_en_conversacion, esperando_respuesta_litio
+
+@app.post("/mensaje")
+async def recibir_mensaje(message: Message):
+    global nombre_pendiente, rut_pendiente
+
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     texto = message.content
 
@@ -51,21 +57,32 @@ async def recibir_mensaje(message: Message):
         rut_en_conversacion = rut
     elif nombre and rut:
         pacientes_en_sesion[rut] = nombre
+
         rut_en_conversacion = rut
         nombre_pendiente = ""
         rut_pendiente = ""
         esperando_respuesta_litio = True
         return {"respuesta": f"Gracias {nombre.split()[0]}, ¿estás tomando litio actualmente?"}
+
+        nombre_pendiente = ""
+        rut_pendiente = ""
+
     elif nombre and not rut:
         nombre_pendiente = nombre
         if rut_pendiente:
             pacientes_en_sesion[rut_pendiente] = nombre
+## //revisar-código-para-respuesta-incorrecta
             rut_en_conversacion = rut_pendiente
             rut = rut_pendiente
             nombre_pendiente = ""
             rut_pendiente = ""
             esperando_respuesta_litio = True
             return {"respuesta": f"Gracias {nombre.split()[0]}, ¿estás tomando litio actualmente?"}
+
+            rut = rut_pendiente
+            nombre_pendiente = ""
+            rut_pendiente = ""
+
         else:
             registrar_rut_fallido(texto, nombre, rut)
             return {"respuesta": f"Gracias {nombre.split()[0]}, ¿podrías indicarme tu RUT?"}
@@ -73,12 +90,18 @@ async def recibir_mensaje(message: Message):
         rut_pendiente = rut
         if nombre_pendiente:
             pacientes_en_sesion[rut] = nombre_pendiente
+
             rut_en_conversacion = rut
             nombre = nombre_pendiente
             nombre_pendiente = ""
             rut_pendiente = ""
             esperando_respuesta_litio = True
             return {"respuesta": f"Gracias {nombre.split()[0]}, ¿estás tomando litio actualmente?"}
+=======
+            nombre = nombre_pendiente
+            nombre_pendiente = ""
+            rut_pendiente = ""
+
         else:
             registrar_rut_fallido(texto, nombre, rut)
             return {"respuesta": "Gracias. ¿Cuál es tu nombre completo?"}
