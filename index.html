@@ -4,17 +4,17 @@
   <meta charset="UTF-8" />
   <title>LitioGPT</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 1rem; background: #f7f7f7; }
-    h2 { text-align: center; }
-    .chat-box { background: white; border: 1px solid #ccc; border-radius: 5px; padding: 1rem; height: 400px; overflow-y: auto; margin-bottom: 1rem; }
-    .mensaje-paciente { color: black; background: #e0f0ff; padding: 0.5rem; border-radius: 5px; margin-bottom: 0.5rem; }
-    .mensaje-bot { color: white; background: #0077cc; padding: 0.5rem; border-radius: 5px; margin-bottom: 0.5rem; text-align: right; }
-    textarea { width: 100%; height: 70px; resize: none; }
-    button { background: #0077cc; color: white; border: none; padding: 0.5rem 1rem; border-radius: 5px; cursor: pointer; margin-top: 0.5rem; float: right; }
+    body { font-family: Arial, sans-serif; max-width: 700px; margin: auto; padding: 1rem; background: linear-gradient(#eef2f5, #dfe7ec); color: #222; }
+    h2 { text-align: center; margin-bottom: 1rem; }
+    .chat-box { background: white; border: 1px solid #ccc; border-radius: 8px; padding: 1rem; height: 420px; overflow-y: auto; margin-bottom: 1rem; }
+    .mensaje-paciente { background: #e0f0ff; padding: 0.5rem; border-radius: 8px; margin-bottom: 0.5rem; }
+    .mensaje-bot { background: #0077cc; color: white; padding: 0.5rem; border-radius: 8px; margin-bottom: 0.5rem; text-align: right; }
+    textarea { width: 100%; height: 70px; resize: none; border-radius: 8px; padding: 0.5rem; border: 1px solid #ccc; }
+    button { background: #0077cc; color: white; border: none; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; margin-top: 0.5rem; float: right; }
   </style>
 </head>
 <body>
-  <h2>LitioGPT 0.10.1</h2>
+  <h2>LitioGPT 0.11.0</h2>
   <div class="chat-box" id="chat"></div>
   <textarea id="input" placeholder="Escribe tu mensaje aquí..."></textarea>
   <button onclick="enviarMensaje()">Enviar</button>

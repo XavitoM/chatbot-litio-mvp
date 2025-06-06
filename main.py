@@ -24,8 +24,13 @@ class Message(BaseModel):
     content: str
 
 pacientes_en_sesion = {}  # rut -> nombre
+nombre_pendiente = ""
+rut_pendiente = ""
+rut_en_conversacion = ""
+esperando_respuesta_litio = False
 @app.post("/mensaje")
 async def recibir_mensaje(message: Message):
+    global nombre_pendiente, rut_pendiente, rut_en_conversacion, esperando_respuesta_litio
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     texto = message.content
 
@@ -35,18 +40,58 @@ async def recibir_mensaje(message: Message):
 
     print("DEBUG | Nombre extraído:", nombre, "| RUT normalizado:", rut)
 
+    if esperando_respuesta_litio and rut_en_conversacion:
+        esperando_respuesta_litio = False
+        if "no" in texto.lower():
+            return {"respuesta": "Entiendo, si en algún momento comienzas un tratamiento con litio avísame para acompañarte."}
+        return {"respuesta": "Perfecto, seguimos atentos a tus síntomas y dudas."}
+
     if rut in pacientes_en_sesion:
         nombre = pacientes_en_sesion[rut]
+        rut_en_conversacion = rut
     elif nombre and rut:
         pacientes_en_sesion[rut] = nombre
+        rut_en_conversacion = rut
+        nombre_pendiente = ""
+        rut_pendiente = ""
+        esperando_respuesta_litio = True
+        return {"respuesta": f"Gracias {nombre.split()[0]}, ¿estás tomando litio actualmente?"}
+    elif nombre and not rut:
+        nombre_pendiente = nombre
+        if rut_pendiente:
+            pacientes_en_sesion[rut_pendiente] = nombre
+            rut_en_conversacion = rut_pendiente
+            rut = rut_pendiente
+            nombre_pendiente = ""
+            rut_pendiente = ""
+            esperando_respuesta_litio = True
+            return {"respuesta": f"Gracias {nombre.split()[0]}, ¿estás tomando litio actualmente?"}
+        else:
+            registrar_rut_fallido(texto, nombre, rut)
+            return {"respuesta": f"Gracias {nombre.split()[0]}, ¿podrías indicarme tu RUT?"}
+    elif rut and not nombre:
+        rut_pendiente = rut
+        if nombre_pendiente:
+            pacientes_en_sesion[rut] = nombre_pendiente
+            rut_en_conversacion = rut
+            nombre = nombre_pendiente
+            nombre_pendiente = ""
+            rut_pendiente = ""
+            esperando_respuesta_litio = True
+            return {"respuesta": f"Gracias {nombre.split()[0]}, ¿estás tomando litio actualmente?"}
+        else:
+            registrar_rut_fallido(texto, nombre, rut)
+            return {"respuesta": "Gracias. ¿Cuál es tu nombre completo?"}
     else:
-        registrar_rut_fallido(texto, nombre, rut)
-        respuesta_presentacion = (
-            "Hola, soy tu asistente médico. Estoy aquí para ayudarte a monitorear tu tratamiento con litio y tus síntomas. "
-            "Por ahora no pude registrar tu nombre o RUT correctamente, ya que soy un prototipo aún en desarrollo. "
-            "De todos modos, puedes contarme lo que te pasa y haré lo mejor posible por ayudarte."
-        )
-        return {"respuesta": respuesta_presentacion}
+        if rut_en_conversacion:
+            nombre = pacientes_en_sesion.get(rut_en_conversacion, "")
+        else:
+            registrar_rut_fallido(texto, nombre, rut)
+            respuesta_presentacion = (
+                "Hola, soy tu asistente médico. Estoy aquí para ayudarte con tu tratamiento con litio. "
+                "Aún no logro registrar tu nombre o RUT. Por favor indícalos para continuar."
+            )
+            return {"respuesta": respuesta_presentacion}
 
     if requiere_aclaracion(texto):
         return {"respuesta": "¿Podrías explicarme un poco más a qué te refieres con eso? Quiero entender bien para poder ayudarte mejor."}
@@ -58,14 +103,14 @@ async def recibir_mensaje(message: Message):
     respuesta = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[
-            {"role": "system", "content": "Eres un asistente médico experto en seguimiento de pacientes con litio. Evalúas criterios de gravedad de forma no sugestiva porque tus pacientes son vulnerables. Además, debes consultar al menos una vez a la semana sobre los síntomas suicidas y evaluar su gravedad según las escalas más modernas."},
+            {"role": "system", "content": "Eres un asistente médico experto en seguimiento de pacientes que toman litio. Respondes con empatía y de forma concisa. Evalúas criterios de gravedad de manera no sugestiva y preguntas al menos una vez por semana por síntomas suicidas."},
             {"role": "user", "content": texto}
         ]
     )
 
     contenido_respuesta = respuesta.choices[0].message.content
 
-    if "urgencias" in contenido_respuesta.lower():
+    if "urgencias" in contenido_respuesta.lower() or any(p in resumen for p in ["síntomas neurológicos", "ideas suicidas"]):
         enviar_correo_alerta(texto, contenido_respuesta)
 
     registrar_interaccion(nombre, rut, texto, contenido_respuesta, resumen)
@@ -107,8 +152,8 @@ def registrar_rut_fallido(texto, nombre, rut):
 
 def extraer_rut(texto):
     texto = texto.replace(".", "").replace(" ", "").lower()
-    posibles = re.findall(r"\b\d{7,8}-?[\dk]\b", texto)
-    return posibles[0] if posibles else ""
+    match = re.search(r"\d{7,8}-?[0-9k]", texto)
+    return match.group(0) if match else ""
 
 def normalizar_rut(rut):
     rut = rut.replace(".", "").replace(" ", "").upper()
@@ -119,13 +164,11 @@ def normalizar_rut(rut):
     return ""
 
 def extraer_nombre(texto):
-    texto_limpio = re.sub(r"\b\d{7,8}-?[\dk]\b", "", texto)  # eliminar posibles RUTs
-    texto_limpio = texto_limpio.lower()
-    texto_limpio = re.sub(r"mi nombre es|soy|me llamo", "", texto_limpio)
-    partes = texto_limpio.strip().split()
-    posibles = [p for p in partes if p.isalpha() and len(p) > 2]
-    if len(posibles) >= 2:
-        return f"{posibles[0].capitalize()} {posibles[1].capitalize()}"
+    texto_limpio = re.sub(r"\b\d{7,8}-?[0-9kK]\b", "", texto, flags=re.IGNORECASE)
+    texto_limpio = re.sub(r"\brut\b", "", texto_limpio, flags=re.IGNORECASE)
+    palabras = re.findall(r"[A-Za-zÁÉÍÓÚáéíóúÑñ]+", texto_limpio)
+    if len(palabras) >= 2:
+        return f"{palabras[-2].capitalize()} {palabras[-1].capitalize()}"
     return ""
 
 def requiere_aclaracion(texto):
