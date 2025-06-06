@@ -81,7 +81,7 @@ def registrar_interaccion(nombre, rut, mensaje, respuesta, resumen):
         writer = csv.writer(f)
         writer.writerow([fecha, nombre, rut, resumen])
 
-    archivo = f"conversaciones/{rut}.txt"
+    archivo = f"conversaciones/{rut.replace('-', '').lower()}.txt"
     with open(archivo, "a", encoding="utf-8") as f:
         f.write(f"[{fecha}] Usuario: {mensaje}\n")
         f.write(f"[{fecha}] Bot: {respuesta}\n\n")
@@ -134,5 +134,3 @@ async def serve_index():
     path = os.path.join(os.path.dirname(__file__), "index.html")
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
-
-
