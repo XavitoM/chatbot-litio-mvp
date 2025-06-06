@@ -97,7 +97,7 @@ async def recibir_mensaje(message: Message):
             rut_pendiente = ""
             esperando_respuesta_litio = True
             return {"respuesta": f"Gracias {nombre.split()[0]}, ¿estás tomando litio actualmente?"}
-=======
+
             nombre = nombre_pendiente
             nombre_pendiente = ""
             rut_pendiente = ""
