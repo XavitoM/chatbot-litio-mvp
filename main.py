@@ -26,9 +26,11 @@ class Message(BaseModel):
 pacientes_en_sesion = {}  # rut -> nombre
 nombre_pendiente = ""
 rut_pendiente = ""
+rut_en_conversacion = ""
+esperando_respuesta_litio = False
 @app.post("/mensaje")
 async def recibir_mensaje(message: Message):
-    global nombre_pendiente, rut_pendiente
+    global nombre_pendiente, rut_pendiente, rut_en_conversacion, esperando_respuesta_litio
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     texto = message.content
 
@@ -38,19 +40,32 @@ async def recibir_mensaje(message: Message):
 
     print("DEBUG | Nombre extraído:", nombre, "| RUT normalizado:", rut)
 
+    if esperando_respuesta_litio and rut_en_conversacion:
+        esperando_respuesta_litio = False
+        if "no" in texto.lower():
+            return {"respuesta": "Entiendo, si en algún momento comienzas un tratamiento con litio avísame para acompañarte."}
+        return {"respuesta": "Perfecto, seguimos atentos a tus síntomas y dudas."}
+
     if rut in pacientes_en_sesion:
         nombre = pacientes_en_sesion[rut]
+        rut_en_conversacion = rut
     elif nombre and rut:
         pacientes_en_sesion[rut] = nombre
+        rut_en_conversacion = rut
         nombre_pendiente = ""
         rut_pendiente = ""
+        esperando_respuesta_litio = True
+        return {"respuesta": f"Gracias {nombre.split()[0]}, ¿estás tomando litio actualmente?"}
     elif nombre and not rut:
         nombre_pendiente = nombre
         if rut_pendiente:
             pacientes_en_sesion[rut_pendiente] = nombre
+            rut_en_conversacion = rut_pendiente
             rut = rut_pendiente
             nombre_pendiente = ""
             rut_pendiente = ""
+            esperando_respuesta_litio = True
+            return {"respuesta": f"Gracias {nombre.split()[0]}, ¿estás tomando litio actualmente?"}
         else:
             registrar_rut_fallido(texto, nombre, rut)
             return {"respuesta": f"Gracias {nombre.split()[0]}, ¿podrías indicarme tu RUT?"}
@@ -58,20 +73,25 @@ async def recibir_mensaje(message: Message):
         rut_pendiente = rut
         if nombre_pendiente:
             pacientes_en_sesion[rut] = nombre_pendiente
+            rut_en_conversacion = rut
             nombre = nombre_pendiente
             nombre_pendiente = ""
             rut_pendiente = ""
+            esperando_respuesta_litio = True
+            return {"respuesta": f"Gracias {nombre.split()[0]}, ¿estás tomando litio actualmente?"}
         else:
             registrar_rut_fallido(texto, nombre, rut)
             return {"respuesta": "Gracias. ¿Cuál es tu nombre completo?"}
     else:
-        registrar_rut_fallido(texto, nombre, rut)
-        respuesta_presentacion = (
-            "Hola, soy tu asistente médico. Estoy aquí para ayudarte a monitorear tu tratamiento con litio y tus síntomas. "
-            "Por ahora no pude registrar tu nombre o RUT correctamente, ya que soy un prototipo aún en desarrollo. "
-            "De todos modos, puedes contarme lo que te pasa y haré lo mejor posible por ayudarte."
-        )
-        return {"respuesta": respuesta_presentacion}
+        if rut_en_conversacion:
+            nombre = pacientes_en_sesion.get(rut_en_conversacion, "")
+        else:
+            registrar_rut_fallido(texto, nombre, rut)
+            respuesta_presentacion = (
+                "Hola, soy tu asistente médico. Estoy aquí para ayudarte con tu tratamiento con litio. "
+                "Aún no logro registrar tu nombre o RUT. Por favor indícalos para continuar."
+            )
+            return {"respuesta": respuesta_presentacion}
 
     if requiere_aclaracion(texto):
         return {"respuesta": "¿Podrías explicarme un poco más a qué te refieres con eso? Quiero entender bien para poder ayudarte mejor."}
@@ -83,14 +103,14 @@ async def recibir_mensaje(message: Message):
     respuesta = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[
-            {"role": "system", "content": "Eres un asistente médico experto en seguimiento de pacientes con litio. Evalúas criterios de gravedad de forma no sugestiva porque tus pacientes son vulnerables. Además, debes consultar al menos una vez a la semana sobre los síntomas suicidas y evaluar su gravedad según las escalas más modernas."},
+            {"role": "system", "content": "Eres un asistente médico experto en seguimiento de pacientes que toman litio. Respondes con empatía y de forma concisa. Evalúas criterios de gravedad de manera no sugestiva y preguntas al menos una vez por semana por síntomas suicidas."},
             {"role": "user", "content": texto}
         ]
     )
 
     contenido_respuesta = respuesta.choices[0].message.content
 
-    if "urgencias" in contenido_respuesta.lower():
+    if "urgencias" in contenido_respuesta.lower() or any(p in resumen for p in ["síntomas neurológicos", "ideas suicidas"]):
         enviar_correo_alerta(texto, contenido_respuesta)
 
     registrar_interaccion(nombre, rut, texto, contenido_respuesta, resumen)

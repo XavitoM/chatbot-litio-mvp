@@ -26,10 +26,9 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
-4. Abre `web/index.html` en tu navegador.
+4. Abre `index.html` en tu navegador.
 
-El bot ahora puede recordar tu nombre o RUT si los envías por separado. Si solo
-envías tu nombre, se te solicitará el RUT en el siguiente mensaje y viceversa.
+El bot recuerda tu nombre o RUT si los envías por separado. Una vez que se registran ambos datos, te consultará si estás tomando litio para ofrecerte acompañamiento personalizado.
 
 Para ejecutar las pruebas:
 ```
