@@ -33,11 +33,11 @@
     input.value = "";
 
     try {
-      const respuesta = await fetch("/mensaje", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: mensaje })
-      });
+const respuesta = await fetch("https://chatbot-litio-mvp.onrender.com/mensaje", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ content: mensaje })
+});
 
       const data = await respuesta.json();
       agregarMensaje("mensaje-bot", data.respuesta);
