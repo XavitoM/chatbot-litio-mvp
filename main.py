@@ -24,6 +24,7 @@ class Message(BaseModel):
     content: str
 
 pacientes_en_sesion = {}  # rut -> nombre
+
 @app.post("/mensaje")
 async def recibir_mensaje(message: Message):
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -104,14 +105,15 @@ def registrar_rut_fallido(texto):
         f.write(f"[{fecha}] Texto sin RUT válido: {texto}\n")
 
 def extraer_rut(texto):
-    texto = texto.replace(".", "").replace(" ", "").lower()
-    posibles = re.findall(r"\b\d{7,8}-?[\dk]\b", texto)
-    return posibles[0] if posibles else ""
+    texto = texto.lower().replace(".", "").replace(" ", "")
+    match = re.search(r"(?:rut|es)?\D*(\d{7,8}-?[\dk])", texto)
+    return match.group(1) if match else ""
 
 def normalizar_rut(rut):
     rut = rut.replace(".", "").replace(" ", "").upper()
     if "-" not in rut and len(rut) >= 8:
         rut = rut[:-1] + "-" + rut[-1]
+    rut = re.sub(r"[^\dK]", "", rut[:-1]) + "-" + rut[-1]  # asegurar formato XXXXXXXX-Y
     if re.match(r"^\d{7,8}-[\dK]$", rut):
         return rut
     return ""
