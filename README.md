@@ -7,7 +7,7 @@ Este proyecto es un MVP para un chatbot de seguimiento de pacientes en tratamien
 - API de ChatGPT para análisis
 - SMTP para alertas por correo a uhciphospitalangol@gmail.com
 
-Cómo usar
+4. Visita `http://localhost:8000/` en tu navegador.
 
 1. Configura tus variables de entorno en `.env`:
 ```
