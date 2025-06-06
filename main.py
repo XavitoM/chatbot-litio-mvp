@@ -23,6 +23,8 @@ app.add_middleware(
 class Message(BaseModel):
     content: str
 
+pacientes_en_sesion = {}  # rut -> nombre
+
 @app.post("/mensaje")
 async def recibir_mensaje(message: Message):
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -32,7 +34,11 @@ async def recibir_mensaje(message: Message):
     rut = normalizar_rut(extraer_rut(texto))
     fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    if not nombre or not rut:
+    if rut in pacientes_en_sesion:
+        nombre = pacientes_en_sesion[rut]
+    elif nombre and rut:
+        pacientes_en_sesion[rut] = nombre
+    else:
         return {"respuesta": "Hola, soy tu asistente médico. Estoy aquí para ayudarte a monitorear tu tratamiento con litio y síntomas relacionados. Antes de comenzar, por favor indícame tu nombre completo y tu RUT para poder registrarte correctamente."}
 
     if requiere_aclaracion(texto):
