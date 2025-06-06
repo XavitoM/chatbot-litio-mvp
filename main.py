@@ -26,22 +26,36 @@ class Message(BaseModel):
 @app.post("/mensaje")
 async def recibir_mensaje(message: Message):
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    texto = message.content
+
+    nombre = extraer_nombre(texto)
+    rut = extraer_rut(texto)
+    fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    if not nombre or not rut:
+        return {"respuesta": "Hola, soy tu asistente médico. Estoy aquí para ayudarte a monitorear tu tratamiento con litio y síntomas relacionados. Antes de comenzar, por favor indícame tu nombre completo y tu RUT para poder registrarte correctamente."}
+
+    if requiere_aclaracion(texto):
+        return {"respuesta": "¿Podrías explicarme un poco más a qué te refieres con eso? Quiero entender bien para poder ayudarte mejor."}
+
+    resumen = sintetizar_resumen(texto)
+    if resumen == "sin hallazgos relevantes":
+        resumen = sintetizar_con_ia(texto, client)
 
     respuesta = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[
             {"role": "system", "content": "Eres un asistente médico experto en seguimiento de pacientes con litio. Evalúas criterios de gravedad de forma no sugestiva porque tus pacientes son vulnerables. Además, debes consultar al menos una vez a la semana sobre los síntomas suicidas y evaluar su gravedad según las escalas más modernas."},
-            {"role": "user", "content": message.content}
+            {"role": "user", "content": texto}
         ]
     )
 
     contenido_respuesta = respuesta.choices[0].message.content
 
     if "urgencias" in contenido_respuesta.lower():
-        enviar_correo_alerta(message.content, contenido_respuesta)
+        enviar_correo_alerta(texto, contenido_respuesta)
 
-    registrar_interaccion(message.content, contenido_respuesta)
-
+    registrar_interaccion(nombre, rut, texto, contenido_respuesta, resumen)
     return {"respuesta": contenido_respuesta}
 
 def enviar_correo_alerta(mensaje_original, respuesta):
@@ -59,20 +73,14 @@ def enviar_correo_alerta(mensaje_original, respuesta):
         servidor.login(remitente, password)
         servidor.send_message(mensaje)
 
-def registrar_interaccion(mensaje, respuesta):
+def registrar_interaccion(nombre, rut, mensaje, respuesta, resumen):
     os.makedirs("conversaciones", exist_ok=True)
-
-    nombre = extraer_nombre(mensaje)
-    rut = extraer_rut(mensaje)
     fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    resumen = sintetizar_resumen(mensaje)
 
-    # Guardar resumen CSV
     with open("registro_resumen.csv", "a", newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         writer.writerow([fecha, nombre, rut, resumen])
 
-    # Guardar conversación completa
     archivo = f"conversaciones/{rut or 'sin_rut'}.txt"
     with open(archivo, "a", encoding="utf-8") as f:
         f.write(f"[{fecha}] Usuario: {mensaje}\n")
@@ -89,19 +97,34 @@ def extraer_nombre(texto):
             return f"{partes[i]} {partes[i+1]}"
     return ""
 
+def requiere_aclaracion(texto):
+    frases_vagas = ["no sé", "cosas raras", "me siento raro", "algo pasa", "no entiendo bien", "mal", "terrible", "así no más", "extraño", "como que"]
+    return any(f in texto.lower() for f in frases_vagas)
+
 def sintetizar_resumen(texto):
     texto = texto.lower()
     sintomas = []
-    if any(p in texto for p in ["temblor", "visión", "mareo", "convulsión", "náusea", "confusión"]):
+    if any(p in texto for p in ["temblor", "temblores", "tiritón", "tiritones", "visión", "vision", "mareo", "convulsión", "náusea", "confusión"]):
         sintomas.append("síntomas neurológicos")
-    if "suicidio" in texto or "matarme" in texto or "morir" in texto:
+    if any(p in texto for p in ["suicidio", "matarme", "morir", "quitarme la vida", "dejar de existir"]):
         sintomas.append("ideas suicidas")
     if "litio" in texto:
         sintomas.append("consulta sobre litio")
     return ", ".join(sintomas) or "sin hallazgos relevantes"
+
+def sintetizar_con_ia(texto, client):
+    resumen = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": "Resume en una línea los síntomas o preocupaciones médicas más relevantes de este paciente para su ficha clínica."},
+            {"role": "user", "content": texto}
+        ]
+    )
+    return resumen.choices[0].message.content.strip()
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
     path = os.path.join(os.path.dirname(__file__), "index.html")
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
+
