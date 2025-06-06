@@ -29,7 +29,7 @@ async def recibir_mensaje(message: Message):
     texto = message.content
 
     nombre = extraer_nombre(texto)
-    rut = extraer_rut(texto)
+    rut = normalizar_rut(extraer_rut(texto))
     fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     if not nombre or not rut:
@@ -81,20 +81,27 @@ def registrar_interaccion(nombre, rut, mensaje, respuesta, resumen):
         writer = csv.writer(f)
         writer.writerow([fecha, nombre, rut, resumen])
 
-    archivo = f"conversaciones/{rut or 'sin_rut'}.txt"
+    archivo = f"conversaciones/{rut}.txt"
     with open(archivo, "a", encoding="utf-8") as f:
         f.write(f"[{fecha}] Usuario: {mensaje}\n")
         f.write(f"[{fecha}] Bot: {respuesta}\n\n")
 
 def extraer_rut(texto):
-    posibles = re.findall(r"\b\d{7,8}-?[\dkK]\b|\b\d{1,2}\.\d{3}\.\d{3}-?[\dkK]\b", texto)
+    texto = texto.replace(".", "").replace(" ", "").lower()
+    posibles = re.findall(r"\b\d{7,8}-?[\dk]\b", texto)
     return posibles[0] if posibles else ""
 
+def normalizar_rut(rut):
+    rut = rut.replace(".", "").replace(" ", "").upper()
+    if "-" not in rut and len(rut) >= 8:
+        return rut[:-1] + "-" + rut[-1]
+    return rut
+
 def extraer_nombre(texto):
-    partes = texto.split()
-    for i in range(len(partes) - 1):
-        if partes[i][0].isupper() and partes[i+1][0].isupper():
-            return f"{partes[i]} {partes[i+1]}"
+    partes = texto.strip().split()
+    posibles = [p for p in partes if p.isalpha() and len(p) > 2]
+    if len(posibles) >= 2:
+        return f"{posibles[0]} {posibles[1]}"
     return ""
 
 def requiere_aclaracion(texto):
@@ -127,4 +134,5 @@ async def serve_index():
     path = os.path.join(os.path.dirname(__file__), "index.html")
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
+
 
