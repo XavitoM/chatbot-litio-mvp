@@ -1,14 +1,13 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from pydantic import BaseModel
-from openai import OpenAI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+import os
+import re
 import smtplib
 from email.mime.text import MIMEText
-from fastapi.middleware.cors import CORSMiddleware
-import os
-from fastapi.responses import HTMLResponse
-import csv
-from datetime import datetime
-import re
+from openai import OpenAI
+import json
 
 app = FastAPI()
 
@@ -20,162 +19,58 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+pacientes_en_sesion = {}
+
 class Message(BaseModel):
     content: str
-
-pacientes_en_sesion = {}  # rut -> nombre
-nombre_pendiente = ""
-rut_pendiente = ""
-
-rut_en_conversacion = ""
-esperando_respuesta_litio = False
-@app.post("/mensaje")
-async def recibir_mensaje(message: Message):
-    global nombre_pendiente, rut_pendiente, rut_en_conversacion, esperando_respuesta_litio
-
-
-rut_en_conversacion = ""
-esperando_respuesta_litio = False
-@app.post("/mensaje")
-async def recibir_mensaje(message: Message):
-    global nombre_pendiente, rut_pendiente, rut_en_conversacion, esperando_respuesta_litio
+    nombre: str
+    rut: str
+    tipo_usuario: str
 
 @app.post("/mensaje")
 async def recibir_mensaje(message: Message):
-    global nombre_pendiente, rut_pendiente
+    nombre = message.nombre.strip()
+    rut = normalizar_rut(message.rut.strip())
+    tipo = message.tipo_usuario
 
+    guardar_resumen(nombre, rut, tipo, message.content)
+    guardar_mensaje_completo(nombre, rut, message.content)
 
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    texto = message.content
-    prefijo = ""
-
-    nombre = extraer_nombre(texto)
-    rut = normalizar_rut(extraer_rut(texto))
-    fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    print("DEBUG | Nombre extraído:", nombre, "| RUT normalizado:", rut)
-
-    if esperando_respuesta_litio and rut_en_conversacion:
-        esperando_respuesta_litio = False
-        if "no" in texto.lower():
-            return {"respuesta": "Entiendo, si en algún momento comienzas un tratamiento con litio avísame para acompañarte."}
-        return {"respuesta": "Perfecto, seguimos atentos a tus síntomas y dudas."}
-
-    if rut in pacientes_en_sesion:
-        nombre = pacientes_en_sesion[rut]
-        rut_en_conversacion = rut
-    elif nombre and rut:
-        pacientes_en_sesion[rut] = nombre
-
-        rut_en_conversacion = rut
-        nombre_pendiente = ""
-        rut_pendiente = ""
-        esperando_respuesta_litio = True
-        return {"respuesta": f"Gracias {nombre.split()[0]}, ¿estás tomando litio actualmente?"}
-
-
-        nombre_pendiente = ""
-        rut_pendiente = ""
-
-    elif nombre and not rut:
-        nombre_pendiente = nombre
-        if rut_pendiente:
-            pacientes_en_sesion[rut_pendiente] = nombre
-
-
-## //revisar-código-para-respuesta-incorrecta
-
-            rut_en_conversacion = rut_pendiente
-            rut = rut_pendiente
-            nombre_pendiente = ""
-            rut_pendiente = ""
-            esperando_respuesta_litio = True
-            return {"respuesta": f"Gracias {nombre.split()[0]}, ¿estás tomando litio actualmente?"}
-
-            rut = rut_pendiente
-            nombre_pendiente = ""
-            rut_pendiente = ""
-
-
-        else:
-            registrar_rut_fallido(texto, nombre, rut)
-            return {"respuesta": f"Gracias {nombre.split()[0]}, ¿podrías indicarme tu RUT?"}
-    elif rut and not nombre:
-        rut_pendiente = rut
-        if nombre_pendiente:
-            pacientes_en_sesion[rut] = nombre_pendiente
-
-            rut_en_conversacion = rut
-            nombre = nombre_pendiente
-            nombre_pendiente = ""
-            rut_pendiente = ""
-            esperando_respuesta_litio = True
-            return {"respuesta": f"Gracias {nombre.split()[0]}, ¿estás tomando litio actualmente?"}
-
-            nombre = nombre_pendiente
-            nombre_pendiente = ""
-            rut_pendiente = ""
-
-
-        else:
-            registrar_rut_fallido(texto, nombre, rut)
-            return {"respuesta": "Gracias. ¿Cuál es tu nombre completo?"}
-    else:
-
-        prefijo = ""
-
-        if rut_en_conversacion:
-            nombre = pacientes_en_sesion.get(rut_en_conversacion, "")
-        else:
-            registrar_rut_fallido(texto, nombre, rut)
-
-            prefijo = (
-                "Hola, soy tu asistente médico. Aún no logro registrar tu nombre o RUT. "
-                "Cuéntame, ¿cómo te sientes hoy? "
-            )
-
-            respuesta_presentacion = (
-                "Hola, soy tu asistente médico. Estoy aquí para ayudarte con tu tratamiento con litio. "
-                "Aún no logro registrar tu nombre o RUT. Por favor indícalos para continuar."
-            )
-            return {"respuesta": respuesta_presentacion}
-
-
-    if requiere_aclaracion(texto):
-        return {"respuesta": "¿Podrías explicarme un poco más a qué te refieres con eso? Quiero entender bien para poder ayudarte mejor."}
-
-    resumen = sintetizar_resumen(texto)
-    if resumen == "sin hallazgos relevantes":
-        resumen = sintetizar_con_ia(texto, client)
 
     respuesta = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[
-            {"role": "system", "content": "Eres un asistente médico experto en seguimiento de pacientes que toman litio. Respondes con empatía y de forma concisa. Evalúas criterios de gravedad de manera no sugestiva y preguntas al menos una vez por semana por síntomas suicidas."},
-            {"role": "user", "content": texto}
+            {"role": "system", "content": "Eres un asistente médico experto en seguimiento de pacientes con litio. Evalúas criterios de gravedad y riesgo suicida usando la escala Columbia. Si identificas riesgo médico moderado, avisas al equipo clínico y sugieres consulta precoz. Clasificas y resguardas la información por paciente según su RUT."},
+            {"role": "user", "content": message.content}
         ]
     )
 
     contenido_respuesta = respuesta.choices[0].message.content
 
+    if contiene_alerta_medica(contenido_respuesta):
+        enviar_correo_alerta(nombre, rut, message.content, contenido_respuesta)
 
-    if prefijo:
-        contenido_respuesta = prefijo + contenido_respuesta
-
-
-    if "urgencias" in contenido_respuesta.lower() or any(p in resumen for p in ["síntomas neurológicos", "ideas suicidas"]):
-        enviar_correo_alerta(texto, contenido_respuesta)
-
-    registrar_interaccion(nombre, rut, texto, contenido_respuesta, resumen)
     return {"respuesta": contenido_respuesta}
 
-def enviar_correo_alerta(mensaje_original, respuesta):
+def normalizar_rut(rut):
+    rut = rut.upper().replace(".", "").replace("-", "")
+    if len(rut) > 1:
+        return f"{rut[:-1]}-{rut[-1]}"
+    return rut
+
+def contiene_alerta_medica(texto):
+    patrones = ["urgencia", "riesgo vital", "hospital", "convulsion", "desmayo", "visión borrosa", "ideas suicidas", "querer morir"]
+    return any(p in texto.lower() for p in patrones)
+
+def enviar_correo_alerta(nombre, rut, mensaje_original, respuesta):
     remitente = os.getenv("EMAIL_USER")
     destinatario = "uhciphospitalangol@gmail.com"
     password = os.getenv("EMAIL_PASS")
 
-    mensaje = MIMEText(f"Mensaje del paciente:\n{mensaje_original}\n\nRespuesta de ChatGPT:\n{respuesta}")
-    mensaje['Subject'] = "ALERTA - Prioridad Alta"
+    contenido = f"Nombre: {nombre}\nRUT: {rut}\n\nMensaje del paciente:\n{mensaje_original}\n\nRespuesta del asistente:\n{respuesta}"
+    mensaje = MIMEText(contenido)
+    mensaje['Subject'] = "ALERTA - Revisión Clínica Prioritaria"
     mensaje['From'] = remitente
     mensaje['To'] = destinatario
 
@@ -184,86 +79,27 @@ def enviar_correo_alerta(mensaje_original, respuesta):
         servidor.login(remitente, password)
         servidor.send_message(mensaje)
 
-def registrar_interaccion(nombre, rut, mensaje, respuesta, resumen):
-    os.makedirs("conversaciones", exist_ok=True)
-    fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+def guardar_resumen(nombre, rut, tipo, mensaje):
+    resumen = f"{nombre},{rut},{tipo},{mensaje[:100].replace(',', ' ')}\n"
+    try:
+        with open("registro_resumen.csv", "a", encoding="utf-8") as f:
+            f.write(resumen)
+    except Exception as e:
+        print(f"ERROR al guardar resumen: {e}")
 
-    with open("registro_resumen.csv", "a", newline='', encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow([fecha, nombre, rut, resumen])
-
-    archivo = f"conversaciones/{rut.replace('-', '').lower()}.txt"
-    with open(archivo, "a", encoding="utf-8") as f:
-        f.write(f"[{fecha}] Usuario: {mensaje}\n")
-        f.write(f"[{fecha}] Bot: {respuesta}\n\n")
-
-def registrar_rut_fallido(texto, nombre, rut):
-    os.makedirs("logs", exist_ok=True)
-    with open("logs/rut_fallido.log", "a", encoding="utf-8") as f:
-        fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        f.write(f"[{fecha}] Nombre detectado: '{nombre}' | RUT detectado: '{rut}' | Texto original: {texto}\n")
-
-def extraer_rut(texto):
-    texto = texto.replace(".", "").replace(" ", "").lower()
-    match = re.search(r"\d{7,8}-?[0-9k]", texto)
-    return match.group(0) if match else ""
-
-def normalizar_rut(rut):
-    rut = rut.replace(".", "").replace(" ", "").upper()
-    if "-" not in rut and len(rut) >= 8:
-        rut = rut[:-1] + "-" + rut[-1]
-    if re.match(r"^\d{7,8}-[\dK]$", rut):
-        return rut
-    return ""
-
-def extraer_nombre(texto):
-    texto_limpio = re.sub(r"\b\d{7,8}-?[0-9kK]\b", "", texto, flags=re.IGNORECASE)
-    texto_limpio = re.sub(r"\brut\b", "", texto_limpio, flags=re.IGNORECASE)
-
-    patron = re.compile(
-        r"(?:me\s+llamo|mi\s+nombre\s+es|soy)\s+" +
-        r"([A-Za-zÁÉÍÓÚáéíóúÑñ]{2,})\s+([A-Za-zÁÉÍÓÚáéíóúÑñ]{2,})",
-        flags=re.IGNORECASE,
-    )
-    m = patron.search(texto_limpio)
-    if m:
-        return f"{m.group(1).capitalize()} {m.group(2).capitalize()}"
-
-    palabras = re.findall(r"[A-Za-zÁÉÍÓÚáéíóúÑñ]{2,}", texto_limpio)
-
-    palabras = re.findall(r"[A-Za-zÁÉÍÓÚáéíóúÑñ]+", texto_limpio)
-
-    if len(palabras) >= 2:
-        return f"{palabras[-2].capitalize()} {palabras[-1].capitalize()}"
-    return ""
-
-def requiere_aclaracion(texto):
-    frases_vagas = ["no sé", "cosas raras", "me siento raro", "algo pasa", "no entiendo bien", "mal", "terrible", "así no más", "extraño", "como que"]
-    return any(f in texto.lower() for f in frases_vagas)
-
-def sintetizar_resumen(texto):
-    texto = texto.lower()
-    sintomas = []
-    if any(p in texto for p in ["temblor", "temblores", "tiritón", "tiritones", "visión", "vision", "mareo", "convulsión", "náusea", "confusión"]):
-        sintomas.append("síntomas neurológicos")
-    if any(p in texto for p in ["suicidio", "matarme", "morir", "quitarme la vida", "dejar de existir"]):
-        sintomas.append("ideas suicidas")
-    if "litio" in texto:
-        sintomas.append("consulta sobre litio")
-    return ", ".join(sintomas) or "sin hallazgos relevantes"
-
-def sintetizar_con_ia(texto, client):
-    resumen = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": "Resume en una línea los síntomas o preocupaciones médicas más relevantes de este paciente para su ficha clínica."},
-            {"role": "user", "content": texto}
-        ]
-    )
-    return resumen.choices[0].message.content.strip()
+def guardar_mensaje_completo(nombre, rut, mensaje):
+    rut_archivo = rut.replace("-", "").replace(".", "")
+    archivo = f"interacciones/{rut_archivo}.txt"
+    os.makedirs("interacciones", exist_ok=True)
+    try:
+        with open(archivo, "a", encoding="utf-8") as f:
+            f.write(f"{nombre} ({rut}): {mensaje}\n")
+    except Exception as e:
+        print(f"ERROR al guardar mensaje completo: {e}")
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
     path = os.path.join(os.path.dirname(__file__), "index.html")
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
+
