@@ -6,11 +6,27 @@
   <style>
     body { font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 1rem; background: #f7f7f7; }
     h2 { text-align: center; }
-    .chat-box { display: none; background: white; border: 1px solid #ccc; border-radius: 5px; padding: 1rem; height: 400px; overflow-y: auto; margin-bottom: 1rem; }
-    .mensaje-paciente { color: black; background: #e0f0ff; padding: 0.5rem; border-radius: 5px; margin-bottom: 0.5rem; }
-    .mensaje-bot { color: white; background: #0077cc; padding: 0.5rem; border-radius: 5px; margin-bottom: 0.5rem; text-align: right; }
-    textarea { width: 100%; height: 70px; resize: none; }
-    button { background: #0077cc; color: white; border: none; padding: 0.5rem 1rem; border-radius: 5px; cursor: pointer; margin-top: 0.5rem; float: right; }
+    #chat-box { display: none; border: 1px solid #ccc; border-radius: 5px; background: white; height: 400px; display: flex; flex-direction: column; }
+    #chat { flex: 1; padding: 1rem; overflow-y: auto; }
+    textarea { width: 100%; height: 60px; resize: none; }
+    button { background: #0077cc; color: white; border: none; padding: 0.5rem 1rem; border-radius: 5px; cursor: pointer; margin-top: 0.5rem; }
+    .mensaje-paciente {
+      background: #e0f0ff;
+      margin-bottom: 0.5rem;
+      padding: 0.5rem;
+      border-radius: 5px;
+      white-space: pre-wrap;
+    }
+    .mensaje-bot {
+      background: #0077cc;
+      color: white;
+      margin-bottom: 0.5rem;
+      padding: 0.5rem;
+      border-radius: 5px;
+      text-align: right;
+      white-space: pre-wrap;
+    }
+
     label, select, input { display: block; width: 100%; margin-top: 0.5rem; padding: 0.4rem; font-size: 1rem; }
   </style>
 </head>
@@ -34,13 +50,14 @@
     <button onclick="iniciarChat()">Iniciar Chat</button>
   </div>
 
-  <div class="chat-box" id="chat-box">
-    <div class="chat-box" id="chat"></div>
-    <textarea id="input" placeholder="Escribe tu mensaje aquí..."></textarea>
+  <div id="chat-box">
+    <div id="chat"></div>
+    <textarea id="input" placeholder="Escribe tu mensaje..."></textarea>
     <button onclick="enviarMensaje()">Enviar</button>
   </div>
 
   <script>
+    const BACKEND_URL = window.location.origin;
     let nombre = "";
     let rut = "";
     let tipo = "paciente";
@@ -49,14 +66,13 @@
       nombre = document.getElementById('nombre').value.trim();
       rut = document.getElementById('rut').value.trim();
       tipo = document.getElementById('tipo').value;
-
       if (!nombre || !rut) {
-        alert("Por favor, completa tu nombre y RUT.");
+        alert('Por favor, completa tu nombre y RUT.');
         return;
       }
-
       document.getElementById('login-form').style.display = 'none';
-      document.getElementById('chat-box').style.display = 'block';
+      document.getElementById('chat-box').style.display = 'flex';
+      agregarMensaje('mensaje-bot', `Hola ${nombre}, soy tu asistente de seguimiento.`);
     }
 
     const chat = document.getElementById('chat');
@@ -65,34 +81,31 @@
     async function enviarMensaje() {
       const mensaje = input.value.trim();
       if (!mensaje) return;
-
-      agregarMensaje("mensaje-paciente", mensaje);
-      input.value = "";
-
+      agregarMensaje('mensaje-paciente', mensaje);
+      input.value = '';
       try {
-        const respuesta = await fetch("https://chatbot-litio-mvp.onrender.com/mensaje", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+        const resp = await fetch(`${BACKEND_URL}/mensaje`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ content: mensaje, nombre: nombre, rut: rut, tipo_usuario: tipo })
         });
-
-        const data = await respuesta.json();
-        agregarMensaje("mensaje-bot", data.respuesta);
-      } catch (error) {
-        agregarMensaje("mensaje-bot", "Error al conectar con el servidor.");
+        const data = await resp.json();
+        agregarMensaje('mensaje-bot', data.respuesta);
+      } catch (e) {
+        agregarMensaje('mensaje-bot', 'Error al conectar con el servidor.');
       }
     }
 
     function agregarMensaje(clase, texto) {
-      const msg = document.createElement("div");
-      msg.className = clase;
-      msg.textContent = texto;
-      chat.appendChild(msg);
+      const div = document.createElement('div');
+      div.className = clase;
+      div.textContent = texto;
+      chat.appendChild(div);
       chat.scrollTop = chat.scrollHeight;
     }
 
-    input.addEventListener("keydown", function(event) {
-      if (event.key === "Enter" && !event.shiftKey) {
+    input.addEventListener('keydown', function(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
         enviarMensaje();
       }
