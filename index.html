@@ -14,7 +14,13 @@
   </style>
 </head>
 <body>
+
   <h2>LitioGPT 0.11.1</h2>
+
+
+  <h2>LitioGPT 0.10.3</h2>
+
+
   <div class="chat-box" id="chat"></div>
   <textarea id="input" placeholder="Escribe tu mensaje aquí..."></textarea>
   <button onclick="enviarMensaje()">Enviar</button>
@@ -31,11 +37,11 @@
     input.value = "";
 
     try {
-      const respuesta = await fetch("/mensaje", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: mensaje })
-      });
+const respuesta = await fetch("https://chatbot-litio-mvp.onrender.com/mensaje", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ content: mensaje })
+});
 
       const data = await respuesta.json();
       agregarMensaje("mensaje-bot", data.respuesta);

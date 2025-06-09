@@ -9,6 +9,7 @@ from main import extraer_nombre, extraer_rut, normalizar_rut
 def test_extraer_nombre_introductory():
     assert extraer_nombre("hola, soy xavier martin 17088198-2") == "Xavier Martin"
 
+
 def test_extraer_nombre_intro_phrase():
     frase = "me llamo xavier martin y mi rut es 17088198-2"
     assert extraer_nombre(frase) == "Xavier Martin"
