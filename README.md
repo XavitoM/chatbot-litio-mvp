@@ -26,4 +26,12 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
-4. Abre `web/index.html` en tu navegador.
+4. Visita `http://localhost:8000/` en tu navegador.
+
+El bot recuerda tu nombre o RUT si los envías por separado. Una vez que se registran ambos datos, te consultará si estás tomando litio para ofrecerte acompañamiento personalizado. Si no logra identificar tus datos, de todas formas seguirá la conversación preguntando cómo te sientes.
+
+Para ejecutar las pruebas:
+```
+pip install -r requirements.txt
+pytest
+```
