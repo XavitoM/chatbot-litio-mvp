@@ -10,6 +10,11 @@ def test_extraer_nombre_introductory():
     assert extraer_nombre("hola, soy xavier martin 17088198-2") == "Xavier Martin"
 
 
+def test_extraer_nombre_intro_phrase():
+    frase = "me llamo xavier martin y mi rut es 17088198-2"
+    assert extraer_nombre(frase) == "Xavier Martin"
+
+
 def test_extraer_nombre_rut_prepend():
     assert extraer_nombre("17088198-2 xavier martin") == "Xavier Martin"
 

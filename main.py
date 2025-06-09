@@ -33,12 +33,21 @@ esperando_respuesta_litio = False
 async def recibir_mensaje(message: Message):
     global nombre_pendiente, rut_pendiente, rut_en_conversacion, esperando_respuesta_litio
 
+
+rut_en_conversacion = ""
+esperando_respuesta_litio = False
+@app.post("/mensaje")
+async def recibir_mensaje(message: Message):
+    global nombre_pendiente, rut_pendiente, rut_en_conversacion, esperando_respuesta_litio
+
 @app.post("/mensaje")
 async def recibir_mensaje(message: Message):
     global nombre_pendiente, rut_pendiente
 
+
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     texto = message.content
+    prefijo = ""
 
     nombre = extraer_nombre(texto)
     rut = normalizar_rut(extraer_rut(texto))
@@ -64,6 +73,7 @@ async def recibir_mensaje(message: Message):
         esperando_respuesta_litio = True
         return {"respuesta": f"Gracias {nombre.split()[0]}, ¿estás tomando litio actualmente?"}
 
+
         nombre_pendiente = ""
         rut_pendiente = ""
 
@@ -71,7 +81,10 @@ async def recibir_mensaje(message: Message):
         nombre_pendiente = nombre
         if rut_pendiente:
             pacientes_en_sesion[rut_pendiente] = nombre
+
+
 ## //revisar-código-para-respuesta-incorrecta
+
             rut_en_conversacion = rut_pendiente
             rut = rut_pendiente
             nombre_pendiente = ""
@@ -82,6 +95,7 @@ async def recibir_mensaje(message: Message):
             rut = rut_pendiente
             nombre_pendiente = ""
             rut_pendiente = ""
+
 
         else:
             registrar_rut_fallido(texto, nombre, rut)
@@ -102,19 +116,30 @@ async def recibir_mensaje(message: Message):
             nombre_pendiente = ""
             rut_pendiente = ""
 
+
         else:
             registrar_rut_fallido(texto, nombre, rut)
             return {"respuesta": "Gracias. ¿Cuál es tu nombre completo?"}
     else:
+
+        prefijo = ""
+
         if rut_en_conversacion:
             nombre = pacientes_en_sesion.get(rut_en_conversacion, "")
         else:
             registrar_rut_fallido(texto, nombre, rut)
+
+            prefijo = (
+                "Hola, soy tu asistente médico. Aún no logro registrar tu nombre o RUT. "
+                "Cuéntame, ¿cómo te sientes hoy? "
+            )
+
             respuesta_presentacion = (
                 "Hola, soy tu asistente médico. Estoy aquí para ayudarte con tu tratamiento con litio. "
                 "Aún no logro registrar tu nombre o RUT. Por favor indícalos para continuar."
             )
             return {"respuesta": respuesta_presentacion}
+
 
     if requiere_aclaracion(texto):
         return {"respuesta": "¿Podrías explicarme un poco más a qué te refieres con eso? Quiero entender bien para poder ayudarte mejor."}
@@ -132,6 +157,11 @@ async def recibir_mensaje(message: Message):
     )
 
     contenido_respuesta = respuesta.choices[0].message.content
+
+
+    if prefijo:
+        contenido_respuesta = prefijo + contenido_respuesta
+
 
     if "urgencias" in contenido_respuesta.lower() or any(p in resumen for p in ["síntomas neurológicos", "ideas suicidas"]):
         enviar_correo_alerta(texto, contenido_respuesta)
@@ -189,7 +219,20 @@ def normalizar_rut(rut):
 def extraer_nombre(texto):
     texto_limpio = re.sub(r"\b\d{7,8}-?[0-9kK]\b", "", texto, flags=re.IGNORECASE)
     texto_limpio = re.sub(r"\brut\b", "", texto_limpio, flags=re.IGNORECASE)
+
+    patron = re.compile(
+        r"(?:me\s+llamo|mi\s+nombre\s+es|soy)\s+" +
+        r"([A-Za-zÁÉÍÓÚáéíóúÑñ]{2,})\s+([A-Za-zÁÉÍÓÚáéíóúÑñ]{2,})",
+        flags=re.IGNORECASE,
+    )
+    m = patron.search(texto_limpio)
+    if m:
+        return f"{m.group(1).capitalize()} {m.group(2).capitalize()}"
+
+    palabras = re.findall(r"[A-Za-zÁÉÍÓÚáéíóúÑñ]{2,}", texto_limpio)
+
     palabras = re.findall(r"[A-Za-zÁÉÍÓÚáéíóúÑñ]+", texto_limpio)
+
     if len(palabras) >= 2:
         return f"{palabras[-2].capitalize()} {palabras[-1].capitalize()}"
     return ""
