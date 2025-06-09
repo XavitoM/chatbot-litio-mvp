@@ -1,50 +1,27 @@
-Chatbot Litio MVP
+# Chatbot Litio MVP
 
-Este proyecto es un MVP para un chatbot de seguimiento de pacientes en tratamiento con litio. Utiliza:
+Pequeño asistente de seguimiento para pacientes en tratamiento con litio. El frontend solicita el nombre, RUT y tipo de usuario antes de iniciar la conversación. Luego permite chatear con un bot que evalúa síntomas, riesgo suicida e informa por correo si detecta emergencia.
 
-- Frontend web simple (HTML)
-- Backend en FastAPI
-- API de ChatGPT para análisis
-- SMTP para alertas por correo a uhciphospitalangol@gmail.com
+## Uso rápido
 
-4. Visita `http://localhost:8000/` en tu navegador.
-
-1. Configura tus variables de entorno en `.env`:
-```
-OPENAI_API_KEY=tu_clave
-EMAIL_USER=tu_correo@gmail.com
-EMAIL_PASS=tu_contraseña
-```
-
+1. Crea un archivo `.env` con tus claves:
+   ```
+   OPENAI_API_KEY=tu_clave
+   EMAIL_USER=tu_correo@gmail.com
+   EMAIL_PASS=tu_contraseña
+   ```
 2. Instala dependencias:
+   ```
+   pip install -r requirements.txt
+   ```
+3. Ejecuta el servidor:
+   ```
+   uvicorn main:app --reload
+   ```
+4. Abre `http://localhost:8000/` en tu navegador y completa el formulario para comenzar a chatear.
+
+## Pruebas
+
 ```
-pip install -r requirements.txt
-```
-
-3. Corre el servidor:
-```
-uvicorn main:app --reload
-```
-
-
-4. Visita `http://localhost:8000/` en tu navegador.
-
-El bot recuerda tu nombre o RUT si los envías por separado. Una vez que se registran ambos datos, te consultará si estás tomando litio para ofrecerte acompañamiento personalizado. Si no logra identificar tus datos, de todas formas seguirá la conversación preguntando cómo te sientes.
-
-gcudmw-codex/revisar-código-para-respuesta-incorrecta
-4. Abre `index.html` en tu navegador.
-
-El bot recuerda tu nombre o RUT si los envías por separado. Una vez que se registran ambos datos, te consultará si estás tomando litio para ofrecerte acompañamiento personalizado.
-
-4. Abre `web/index.html` en tu navegador.
-
-El bot ahora puede recordar tu nombre o RUT si los envías por separado. Si solo
-envías tu nombre, se te solicitará el RUT en el siguiente mensaje y viceversa.
-
-
-
-Para ejecutar las pruebas:
-```
-pip install -r requirements.txt
 pytest
 ```
